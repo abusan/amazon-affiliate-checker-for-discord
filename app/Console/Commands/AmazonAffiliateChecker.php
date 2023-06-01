@@ -26,6 +26,7 @@ class AmazonAffiliateChecker extends Command
     protected string $csvPath = '';
     protected string $resultOutputPath = '';
     protected string $resultFilename = '';
+    protected bool $isAmznLinkCheck = false;
     protected int $sleeptime = 1000000;
 
     protected const CSV_COLUMN_AuthorID = 0;
@@ -41,6 +42,8 @@ class AmazonAffiliateChecker extends Command
     public function handle()
     {
         $this->sleeptime = config('checker.sleepMicrotime', 1000000);
+
+        $this->isAmznLinkCheck = config('checker.amznLinkCheck'. false);
 
         $this->csvPath = config('checker.csvPath') ?? $this->csvPath;
         if (empty($this->csvPath)) {
@@ -107,8 +110,7 @@ class AmazonAffiliateChecker extends Command
                 foreach ($result[0] as $checkURL){
 
                     $affiliateID = '';
-
-                    $isAffiliate = false;
+                    $redirectURL = '';
 
                     // Amazon?
                     if (strpos($checkURL, 'amazon') !== false) {
@@ -117,13 +119,10 @@ class AmazonAffiliateChecker extends Command
                         // アフィチェック
                         // ?から下を取得
                         $affiliateID = $this->checkAffiliate($checkURL);
-                        if ($affiliateID) {
-                            $isAffiliate = true;
-                        }
                     }
 
                     // amzn?
-                    if (strpos($checkURL, 'amzn') !== false) {
+                    if ($this->isAmznLinkCheck && strpos($checkURL, 'amzn') !== false) {
                         // curlで確認
                         $curl = curl_init();
                         curl_setopt($curl, CURLOPT_URL, $checkURL);
@@ -138,15 +137,12 @@ class AmazonAffiliateChecker extends Command
                         
                         $redirectURL = $info['redirect_url'];
                         $affiliateID = $this->checkAffiliate($redirectURL);
-                        if ($affiliateID) {
-                            $isAffiliate = true;
-                        }
 
                         // curl実行時のみsleep
                         usleep($this->sleeptime);
                     }
 
-                    if ($isAffiliate) {
+                    if ($affiliateID) {
                         // 日付を見やすい形に
                         // 03/24/2022 1:03 AM -> 2022-03-24 01:03
                         $postDate = DateTimeImmutable::createFromFormat('m/d/Y H:i A', $date);
